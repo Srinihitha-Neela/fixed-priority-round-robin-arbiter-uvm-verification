@@ -388,19 +388,13 @@ fixed-priority-round-robin-arbiter-uvm-verification/
 ├── sim/
 │   └── run.do
 │
-├── results/
-│   ├── fixed_priority/
-│   │   ├── fixed_priority_waveform.png
-│   │   ├── fixed_priority_coverage.png
-│   │   └── fixed_simulation_log.txt
-│   │
-│   └── round_robin/
-│       ├── round_robin_waveform.png
-│       ├── round_robin_coverage.png
-│       └── round_robin_simulation_log.txt
-│
-└── docs/
-    └── verification_plan.md
+└── results/
+    ├── fixed_priority_waveform.png
+    ├── Fixed_priority_coverage_report.pdf
+    ├── Fixed_simulation_log.pdf
+    ├── round_robin_waveform.png
+    ├── round_robin_coverage.pdf
+    └── Round_robin_simulation_log.pdf
 ```
 
 ---
