@@ -420,7 +420,7 @@ req = 0111 → grant = 0100
 req = 1111 → grant = 1000
 ```
 
-![Fixed Priority Waveform](results/fixed_priority/fixed_priority_waveform.png)
+
 
 ---
 
@@ -439,21 +439,6 @@ the expected grant sequence is:
 ```text
 0001 → 0010 → 0100 → 1000 → ...
 ```
-
-![Round Robin Waveform](results/round_robin/round_robin_waveform.png)
-
----
-
-## Coverage Results
-
-### Fixed-Priority Coverage
-
-![Fixed Priority Coverage](results/fixed_priority/fixed_priority_coverage.png)
-
-### Round-Robin Coverage
-
-![Round Robin Coverage](results/round_robin/round_robin_coverage.png)
-
 ---
 
 ## Tools and Technologies
