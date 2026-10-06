@@ -1,23 +1,19 @@
 //=========================================================
-// File: tb_fixed.sv
+// File: tb_round_robin.sv
 //
-// Top-level testbench for the FIXED-PRIORITY arbiter.
+// Top-level testbench for the ROUND-ROBIN arbiter.
 //
 // Responsibilities:
 //
-//   1. Generate a clock for UVM synchronization.
-//   2. Instantiate the common arbiter interface.
-//   3. Instantiate the fixed-priority DUT.
-//   4. Pass the interface to UVM using config_db.
-//   5. Start fixed_arbiter_test.
-//
-// Note:
-// The fixed-priority DUT itself does NOT need a clock.
-// The clock exists only so the reusable UVM driver and
-// monitor have a common synchronization mechanism.
+//   1. Generate clock.
+//   2. Instantiate common arbiter interface.
+//   3. Instantiate round-robin DUT.
+//   4. Generate DUT reset.
+//   5. Pass interface to UVM using config_db.
+//   6. Start round_robin_test.
 //=========================================================
 
-module tb_fixed;
+module tb_round_robin;
 
     // ----------------------------------------------------
     // Import UVM and our arbiter package.
@@ -33,16 +29,7 @@ module tb_fixed;
     logic clk;
 
 
-    // ----------------------------------------------------
-    // Generate a clock.
-    //
-    // Initial value:
-    //     clk = 0
-    //
-    // Toggle every 5 time units.
-    //
-    // Therefore the full clock period is 10 time units.
-    // ----------------------------------------------------
+    // Clock period = 10 time units.
     initial begin
         clk = 1'b0;
 
@@ -51,71 +38,77 @@ module tb_fixed;
 
 
     // ====================================================
-    // INTERFACE
-    //
-    // Instantiate our common arbiter interface.
-    //
-    // clk is passed into the interface.
+    // COMMON INTERFACE
     // ====================================================
 
     arbiter_if arb_if(clk);
 
 
     // ====================================================
-    // DUT
+    // ROUND-ROBIN DUT
     //
-    // Fixed-priority arbiter has only:
+    // Unlike the fixed-priority arbiter, this DUT uses:
     //
-    //     req
-    //     grant
-    //
-    // It does NOT use clk or reset.
+    //   clk
+    //   reset
+    //   req
+    //   grant
     // ====================================================
 
-    fixed_priority_arbiter dut (
+    round_robin_arbiter dut (
+        .clk   (arb_if.clk),
+        .reset (arb_if.reset),
         .req   (arb_if.req),
         .grant (arb_if.grant)
     );
 
 
     // ====================================================
-    // UVM SETUP
+    // RESET GENERATION
     // ====================================================
 
     initial begin
       
-        arb_if.is_rr = 1'b0;
+        arb_if.is_rr = 1'b1;
 
-        // ------------------------------------------------
-        // The fixed-priority DUT has no reset.
-        //
-        // However, our reusable interface contains reset
-        // because the round-robin DUT needs it.
-        //
-        // Keep reset LOW for the fixed-priority test.
-        // ------------------------------------------------
-        arb_if.reset = 1'b0;
-
-
-        // ------------------------------------------------
-        // Start req at zero.
-        //
-        // Later the UVM driver will control req.
-        // ------------------------------------------------
+        // Start with no requests.
         arb_if.req = 4'b0000;
 
+        // Assert reset.
+        arb_if.reset = 1'b1;
+
+        // Keep reset asserted through clock edges.
+        //
+        // This initializes the DUT pointer to:
+        //
+        //     pointer = 2'b00
+        //
+        repeat (2)
+            @(posedge clk);
+
+        // Deassert reset away from the positive edge.
+        //
+        // Doing this on the negative edge avoids ambiguity
+        // with the DUT's positive-edge sequential logic.
+        @(negedge clk);
+
+        arb_if.reset = 1'b0;
+
+    end
+
+
+    // ====================================================
+    // UVM STARTUP
+    // ====================================================
+
+    initial begin
 
         // ------------------------------------------------
-        // Put the physical interface into UVM config_db.
+        // Make the physical interface available to UVM.
         //
-        // Driver and monitor contain:
+        // Driver and monitor retrieve it as:
         //
-        //     virtual arbiter_if vif;
-        //
-        // and retrieve this interface during build_phase.
-        //
-        // "*" means components below the UVM hierarchy
-        // may retrieve this interface using the key "vif".
+        // virtual arbiter_if vif;
         // ------------------------------------------------
         uvm_config_db #(virtual arbiter_if)::set(
             null,
@@ -126,17 +119,9 @@ module tb_fixed;
 
 
         // ------------------------------------------------
-        // Start the UVM test.
-        //
-        // UVM factory finds:
-        //
-        //     fixed_arbiter_test
-        //
-        // because it was registered using:
-        //
-        // `uvm_component_utils(fixed_arbiter_test)
+        // Start round-robin UVM test.
         // ------------------------------------------------
-        run_test("fixed_arbiter_test");
+        run_test("round_robin_test");
 
     end
   
@@ -145,10 +130,9 @@ module tb_fixed;
     // WAVEFORM DUMP
     //=========================================================
     initial begin
-        $dumpfile("fixed_priority_waveform.vcd");
-        $dumpvars(0, tb_fixed);
+        $dumpfile("round_robin_waveform.vcd");
+        $dumpvars(0, tb_round_robin);
     end
 
 
 endmodule
-
