@@ -68,6 +68,8 @@ module tb_round_robin;
     // ====================================================
 
     initial begin
+      
+        arb_if.is_rr = 1'b1;
 
         // Start with no requests.
         arb_if.req = 4'b0000;
