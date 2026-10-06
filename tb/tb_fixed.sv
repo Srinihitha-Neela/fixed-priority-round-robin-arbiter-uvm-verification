@@ -83,6 +83,8 @@ module tb_fixed;
     // ====================================================
 
     initial begin
+      
+        arb_if.is_rr = 1'b0;
 
         // ------------------------------------------------
         // The fixed-priority DUT has no reset.
