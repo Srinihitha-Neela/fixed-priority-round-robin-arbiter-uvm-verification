@@ -1,6 +1,6 @@
 # Fixed-Priority and Round-Robin Arbiter UVM Verification
 
-SystemVerilog/UVM verification of two 4-requester arbiters: a **fixed-priority arbiter** and a **round-robin arbiter**. The verification environment combines directed and constrained-random stimulus, independent reference-model scoreboards, functional coverage, and **SystemVerilog Assertions (SVA)**.
+SystemVerilog/UVM verification of two 4-requester arbiters: a **fixed-priority arbiter** and a **round-robin arbiter**. The verification environment combines directed and constrained-random stimulus, independent reference-model scoreboards, functional coverage, and SystemVerilog Assertions (SVA).
 
 ---
 
