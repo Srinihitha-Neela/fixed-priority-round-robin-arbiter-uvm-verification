@@ -1,69 +1,34 @@
-# UVM Verification of Fixed-Priority and Round-Robin Arbiters
+# Fixed-Priority and Round-Robin Arbiter UVM Verification
 
-## Overview
-
-This project implements and verifies two **4-requester arbitration architectures** using **SystemVerilog and UVM (Universal Verification Methodology)**:
-
-- **Fixed-Priority Arbiter**
-- **Round-Robin Arbiter**
-
-The verification environment uses reusable UVM components, directed and constrained-random stimulus, independent reference-model-based scoreboards, and functional coverage.
-
-The project focuses on verifying arbitration correctness, priority behavior, round-robin fairness, reset behavior, corner cases, and coverage closure.
+SystemVerilog/UVM verification of two 4-requester arbiters: a **fixed-priority arbiter** and a **round-robin arbiter**. The verification environment combines directed and constrained-random stimulus, independent reference-model scoreboards, functional coverage, and **SystemVerilog Assertions (SVA)**.
 
 ---
 
-## Arbiter Designs
+## Project Overview
 
-### 1. Fixed-Priority Arbiter
+This project verifies two arbitration schemes:
 
-The fixed-priority arbiter supports four requesters with the priority:
+### Fixed-Priority Arbiter
 
-```text
-Requester 3 > Requester 2 > Requester 1 > Requester 0
-```
-
-When multiple requests are asserted simultaneously, the highest-priority active requester receives the grant.
-
-Example:
+The fixed-priority arbiter uses the priority order:
 
 ```text
-Request : 0111
-Grant   : 0100
+req[3] > req[2] > req[1] > req[0]
 ```
 
-Although requesters 0, 1, and 2 are active, requester 2 receives the grant because it has the highest priority among the active requesters.
-
-The fixed-priority arbiter is implemented as a combinational design.
-
-### Fixed-Priority Mapping
+If multiple requesters are active simultaneously, the highest-priority requester receives the grant.
 
 | Request | Grant |
 |---|---|
-| 0000 | 0000 |
-| 0001 | 0001 |
-| 0010 | 0010 |
-| 0011 | 0010 |
-| 0100 | 0100 |
-| 0101 | 0100 |
-| 0110 | 0100 |
-| 0111 | 0100 |
-| 1000 | 1000 |
-| 1001 | 1000 |
-| 1010 | 1000 |
-| 1011 | 1000 |
-| 1100 | 1000 |
-| 1101 | 1000 |
-| 1110 | 1000 |
-| 1111 | 1000 |
+| `0000` | `0000` |
+| `0001` | `0001` |
+| `0011` | `0010` |
+| `0111` | `0100` |
+| `1111` | `1000` |
 
----
+### Round-Robin Arbiter
 
-### 2. Round-Robin Arbiter
-
-The round-robin arbiter dynamically changes priority to provide fair access among the four requesters.
-
-A **2-bit pointer** determines where the next arbitration search begins.
+The round-robin arbiter uses a rotating priority pointer to provide fair arbitration among four requesters.
 
 | Pointer | Search Order |
 |---|---|
@@ -72,287 +37,219 @@ A **2-bit pointer** determines where the next arbitration search begins.
 | `10` | 2 → 3 → 0 → 1 |
 | `11` | 3 → 0 → 1 → 2 |
 
-After a requester receives a grant, the pointer moves to the requester immediately following the winner.
+After a requester wins, the pointer advances to the requester immediately following the winner.
 
-For example, with all four requesters continuously active:
-
-```text
-Request = 1111
-
-Pointer    Grant
-----------------
-00         0001
-01         0010
-10         0100
-11         1000
-00         0001
-...
-```
-
-This prevents a single requester from permanently dominating access.
-
-Both the grant and pointer are registered on the positive clock edge.
+The round-robin implementation uses a **registered grant**, so its timing is handled differently from the combinational fixed-priority arbiter in both the scoreboard and SVA.
 
 ---
 
-## UVM Verification Architecture
+## Verification Architecture
 
-The verification environment is organized using standard UVM components.
+The UVM environment contains:
 
 ```text
-                 +------------------+
-                 |     UVM Test     |
-                 +--------+---------+
-                          |
-                          v
-                 +------------------+
-                 |     Sequence     |
-                 +--------+---------+
-                          |
-                          v
-                 +------------------+
-                 |    Sequencer     |
-                 +--------+---------+
-                          |
-                          v
-                 +------------------+
-                 |      Driver      |
-                 +--------+---------+
-                          |
-                          v
-                 +------------------+
-                 |       DUT        |
-                 +--------+---------+
-                          |
-                          v
-                 +------------------+
-                 |     Monitor      |
-                 +--------+---------+
-                          |
-                          v
-                 +------------------+
-                 |    Scoreboard    |
-                 +------------------+
-                    |           |
-                    v           v
-              Reference       Actual
-                Model          DUT
-                    \           /
-                     \         /
-                       Compare
+Sequence
+   |
+Sequencer
+   |
+Driver
+   |
+   v
+  DUT
+   |
+Monitor
+   |
+   +----------------------+
+   |                      |
+   v                      v
+Scoreboard         Functional Coverage
+   |
+Reference Model
+
+Interface SVA independently checks
+cycle-level properties.
 ```
 
-The environment contains:
+Main verification components include:
 
 - Transaction
-- Sequence
+- Directed and constrained-random sequence
 - Sequencer
 - Driver
 - Monitor
 - Agent
 - Environment
-- Base scoreboard
-- Fixed-priority scoreboard
-- Round-robin scoreboard
+- Independent fixed-priority scoreboard
+- Independent round-robin scoreboard
 - Functional coverage
-- Fixed-priority test
-- Round-robin test
+- SystemVerilog Assertions
 
 ---
 
 ## Verification Strategy
 
-The stimulus combines **directed testing, corner-case testing, and constrained-random verification**.
+The main sequence generates **74 transactions**:
 
-The main sequence generates:
+- **16 directed transactions** covering request combinations `0000` through `1111`
+- **8 repeated `1111` transactions** for contention testing
+- **50 constrained-random transactions**
 
-```text
-16 directed request patterns
- 8 repeated all-request cases
-50 constrained-random transactions
-----------------------------------
-74 total transactions
-```
+The directed traffic ensures that all request patterns are exercised.
 
-### Directed Testing
+Repeated full-contention traffic helps exercise round-robin rotation.
 
-All possible 4-bit request combinations are explicitly generated:
-
-```text
-0000
-0001
-0010
-...
-1111
-```
-
-This guarantees that every request pattern is exercised.
-
-### Contention Testing
-
-The request:
-
-```text
-1111
-```
-
-is repeatedly applied to exercise heavy contention.
-
-For the fixed-priority arbiter:
-
-```text
-1111 → 1000
-```
-
-because requester 3 always has the highest priority.
-
-For the round-robin arbiter, repeated contention exercises rotation between requesters.
-
-### Constrained-Random Testing
-
-Additional randomized transactions are generated to exercise different request sequences and state transitions.
+Constrained-random traffic provides additional combinations and state transitions.
 
 ---
 
-## Scoreboard and Reference Models
+## Reference-Model Scoreboards
 
-Independent reference models are used to predict the expected grant.
+### Fixed-Priority Scoreboard
 
-The scoreboard compares:
-
-```text
-Expected Grant  <---- Reference Model
-
-                     VS
-
-Actual Grant    <---- DUT
-```
-
-Any mismatch is reported as a UVM error.
-
----
-
-## Fixed-Priority Reference Model
-
-The expected grant is calculated according to:
+The scoreboard independently predicts the expected grant according to:
 
 ```text
 req[3] > req[2] > req[1] > req[0]
 ```
 
-The reference model independently determines the expected output for each monitored transaction.
+The DUT grant is compared against this prediction for every monitored transaction.
+
+### Round-Robin Scoreboard
+
+The round-robin scoreboard maintains its own reference pointer and independently predicts the expected winning requester.
+
+The scoreboard does **not depend on the DUT's internal pointer**, keeping the reference model independent from the implementation.
 
 ---
 
-## Round-Robin Reference Model
+## SystemVerilog Assertions (SVA)
 
-The round-robin scoreboard maintains its own expected pointer state.
+Concurrent SystemVerilog Assertions are centralized inside:
 
-For every transaction, it:
+```text
+tb/arbiter_if.sv
+```
 
-1. Determines the current expected pointer.
-2. Applies the corresponding round-robin search order.
-3. Predicts the expected grant.
-4. Calculates the next expected pointer.
-5. Compares the expected grant against the DUT output.
+The SVA layer complements the UVM scoreboard by checking important cycle-level and temporal properties during simulation.
 
-The scoreboard does not depend on the DUT's internal pointer for prediction.
+### Common Assertion
+
+The common assertion verifies that:
+
+- Grant contains no `X` or `Z` values.
+- Grant is zero-hot or one-hot using:
+
+```systemverilog
+$onehot0(grant)
+```
+
+Legal values include:
+
+```text
+0000
+0001
+0010
+0100
+1000
+```
+
+Multi-hot grants such as `0011` or `1100` are illegal.
+
+### Fixed-Priority Assertions
+
+The fixed-priority assertions verify:
+
+- No grant is issued to an inactive requester.
+- Any active request results in a grant.
+- Requester 3 receives the grant whenever `req[3]` is active.
+- Requester 2 wins when requester 3 is inactive.
+- Requester 1 wins when requesters 3 and 2 are inactive.
+- Requester 0 wins when it is the highest active requester.
+- No request results in no grant.
+
+Because the fixed-priority DUT is **combinational**, request and grant are checked at the same sampled clock edge.
+
+### Round-Robin Assertions
+
+The round-robin assertions verify:
+
+- No grant is issued to a requester that was not requesting.
+- A previous non-zero request results in a non-zero registered grant.
+- Grant changes under sustained `req = 1111` contention.
+- Reset clears the registered grant.
+
+Because the round-robin arbiter has a **registered output**, `$past(req)` is used where necessary to align the assertions with the DUT timing.
+
+### SVA Cover Properties
+
+Cover properties are also included to demonstrate that important scenarios were exercised:
+
+- `req = 1111` held for four consecutive cycles.
+- Transition from an idle request vector to an active request vector.
+
+The SVA layer is passive and therefore does not modify DUT functionality, stimulus, waveforms, or existing functional coverage.
 
 ---
 
 ## Functional Coverage
 
-Functional coverage is used to measure whether important design scenarios have been exercised.
+Functional coverage is collected separately from SVA/property checking.
 
 ### Fixed-Priority Coverage
 
-The fixed-priority coverage model checks:
-
-- All 16 request patterns
-- All 5 legal grant values
-- All 16 legal request-to-grant mappings
-
-The request-to-grant mappings are explicitly modeled because a generic request × grant cross would contain combinations that are impossible for a correct fixed-priority arbiter.
-
-Example:
-
-```text
-req = 1111
-```
-
-has only one legal output:
-
-```text
-grant = 1000
-```
-
-Therefore, the coverage model focuses on meaningful legal behavior rather than unreachable combinations.
-
-### Fixed-Priority Coverage Result
+The fixed-specific coverage model verifies all 16 legal request-to-grant mappings.
 
 ```text
 Request bins          : 16 / 16 = 100%
-Grant bins            :  5 / 5  = 100%
+Grant bins            : 5 / 5   = 100%
 Correct mapping bins  : 16 / 16 = 100%
 
 fixed_cg coverage     : 100%
 ```
 
----
+This confirms that all fixed-priority request combinations and their expected grant mappings were exercised.
 
-## Round-Robin Coverage
+### Round-Robin Coverage
 
 The round-robin coverage model includes:
 
-- Request coverage
-- Pointer-state coverage
-- Grant coverage
-- Pointer × Request cross coverage
-- Reset-pointer behavior
-- Consecutive same-grant scenarios
+- Request bins
+- Pointer bins
+- Grant bins
+- Pointer × request cross coverage
+- Same-grant scenarios
+- Reset pointer behavior
 
-Unlike the fixed-priority arbiter, the round-robin output depends on both the request and the current pointer:
-
-```text
-Fixed Priority:
-
-Request → Grant
-
-
-Round Robin:
-
-Pointer + Request → Grant
-```
-
-Therefore, pointer × request cross coverage is important for measuring round-robin state-space exploration.
-
-### Current Round-Robin Coverage
+Recorded results:
 
 ```text
-Request bins             : 16 / 16 = 100.00%
-Pointer bins             :  4 / 4  = 100.00%
-Grant bins               :  5 / 5  = 100.00%
-Pointer x Request bins   : 43 / 64 = 67.19%
-Same-grant bins          :  2 / 4  = 50.00%
-Reset pointer 00 hits    : 1
+Request bins            : 16 / 16 = 100.00%
+Pointer bins            : 4 / 4   = 100.00%
+Grant bins              : 5 / 5   = 100.00%
 
-rr_cg coverage           : 93.44%
-same_grant_cg coverage   : 50.00%
+Pointer x Request bins  : 43 / 64 = 67.19%
+Same-grant bins         : 2 / 4   = 50.00%
+
+rr_cg coverage          : 93.44%
 ```
 
-The remaining uncovered pointer × request and same-grant bins identify targets for further coverage-directed stimulus.
+The pointer × request cross is intentionally retained because round-robin behavior depends on both the current request vector and arbitration state.
 
 ---
 
-## Coverage-Driven Verification
+## Simulation Results
 
-One objective of this project is not simply obtaining a high coverage percentage, but developing meaningful coverage models.
+The verification environment successfully processed the generated transactions without functional mismatches in the validated runs.
 
-A generic request × grant cross can include unreachable combinations and therefore does not necessarily represent useful verification progress.
+After SVA was added:
 
-Design-specific coverage was consequently implemented to measure scenarios that correspond to actual arbiter behavior.
+- DUT functionality remained unchanged.
+- Scoreboard results remained unchanged.
+- Waveforms remained unchanged.
+- Existing functional coverage remained unchanged.
+- Additional assertion-based checking was introduced.
 
-For the round-robin arbiter, coverage holes are identified at the pointer × request level so that targeted stimulus can be added instead of relying only on additional random transactions.
+This is expected because assertions act as **passive verification checkers** and do not modify the DUT or generated stimulus.
 
 ---
 
@@ -389,86 +286,49 @@ fixed-priority-round-robin-arbiter-uvm-verification/
 │   └── run.do
 │
 └── results/
-    ├── fixed_priority_waveform.png
     ├── Fixed_priority_coverage_report.pdf
     ├── Fixed_simulation_log.pdf
-    ├── round_robin_waveform.png
+    ├── Round_robin_simulation_log.pdf
+    ├── fixed_priority_waveform.png
     ├── round_robin_coverage.pdf
-    └── Round_robin_simulation_log.pdf
-```
-
----
-
-## Waveform Verification
-
-### Fixed-Priority Arbiter
-
-The fixed-priority waveform demonstrates that the highest-priority active requester receives the grant.
-
-Example cases include:
-
-```text
-req = 0001 → grant = 0001
-req = 0011 → grant = 0010
-req = 0111 → grant = 0100
-req = 1111 → grant = 1000
-```
-
-
-
----
-
-### Round-Robin Arbiter
-
-The round-robin waveform demonstrates pointer-based priority rotation and registered grant behavior.
-
-With continuous contention:
-
-```text
-req = 1111
-```
-
-the expected grant sequence is:
-
-```text
-0001 → 0010 → 0100 → 1000 → ...
+    └── round_robin_waveform.png
 ```
 ---
 
 ## Tools and Technologies
 
-- **SystemVerilog**
-- **UVM (Universal Verification Methodology)**
-- **Cadence Xcelium**
-- **EDA Playground**
-- Functional Coverage
-- Constrained-Random Verification
-- Reference-Model-Based Scoreboarding
+- SystemVerilog
+- UVM
+- SystemVerilog Assertions (SVA)
+- Cadence Xcelium 25.03
+- EDA Playground
+- Functional coverage
+- Waveform analysis
 
 ---
 
 ## Key Verification Concepts Demonstrated
 
-This project demonstrates:
+This project demonstrates practical knowledge of:
 
 - UVM testbench architecture
-- Transaction-level stimulus
-- Sequence and sequencer operation
-- Driver/DUT communication
-- Passive monitoring
-- Analysis-port-based transaction transfer
-- Reusable UVM agent architecture
-- Reference-model-based scoreboarding
-- Stateful round-robin prediction
 - Directed verification
 - Constrained-random verification
+- UVM sequences and transactions
+- Drivers and monitors
+- Self-checking scoreboards
+- Independent reference modeling
 - Functional coverage
 - Cross coverage
-- Coverage-hole analysis
-- Corner-case verification
-- Reset verification
-- One-hot grant behavior
-- Fair arbitration behavior
+- SystemVerilog Assertions
+- `$onehot0()` invariant checking
+- Temporal checking using `$past()`
+- SVA cover properties
+- Combinational versus registered DUT timing
+- Fixed-priority arbitration
+- Stateful round-robin arbitration
+- Contention and fairness-oriented verification
+- Waveform-based debugging
 
 ---
 
@@ -476,23 +336,23 @@ This project demonstrates:
 
 Potential extensions include:
 
-- Coverage-directed sequences for complete round-robin cross coverage
-- SystemVerilog Assertions (SVA)
-- One-hot grant assertions
-- Grant-without-request assertions
-- Round-robin fairness properties
-- Parameterized number of requesters
-- Regression testing with multiple random seeds
-- Additional coverage closure automation
+- Coverage-directed sequences to close the remaining round-robin pointer × request bins.
+- Additional round-robin pointer-transition assertions.
+- Stronger bounded-fairness properties.
+- Parameterizing the arbiter for different numbers of requesters.
+- Regression testing using multiple random seeds.
+- Automated functional and assertion coverage reporting.
 
 ---
 
 ## Conclusion
 
-This project demonstrates the design and UVM-based verification of fixed-priority and round-robin arbiters.
+This project verifies two different arbitration architectures using complementary verification techniques.
 
-The verification environment combines reusable UVM components, independent reference models, scoreboards, directed stimulus, constrained-random stimulus, corner-case testing, and functional coverage.
+The **UVM scoreboards** perform end-to-end functional checking using independent reference models.
 
-The fixed-priority arbiter achieves complete coverage of all defined legal request-to-grant mappings. The round-robin environment additionally verifies state-dependent arbitration using pointer-aware prediction and coverage, enabling systematic identification of remaining coverage holes.
+**Functional coverage** measures whether important request, grant, and round-robin state combinations have been exercised.
 
-The project provides practical experience with verification techniques commonly used in digital design verification workflows.
+**SystemVerilog Assertions** provide an additional layer of cycle-level and temporal checking for arbitration invariants, priority behavior, registered round-robin behavior, and reset handling.
+
+Together, these techniques demonstrate a structured RTL verification methodology applicable to **Digital Verification and Design Verification roles**.
