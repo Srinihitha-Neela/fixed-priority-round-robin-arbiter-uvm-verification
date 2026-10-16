@@ -155,40 +155,6 @@ Legal values include:
 
 Multi-hot grants such as `0011` or `1100` are illegal.
 
-### Fixed-Priority Assertions
-
-The fixed-priority assertions verify:
-
-- No grant is issued to an inactive requester.
-- Any active request results in a grant.
-- Requester 3 receives the grant whenever `req[3]` is active.
-- Requester 2 wins when requester 3 is inactive.
-- Requester 1 wins when requesters 3 and 2 are inactive.
-- Requester 0 wins when it is the highest active requester.
-- No request results in no grant.
-
-Because the fixed-priority DUT is **combinational**, request and grant are checked at the same sampled clock edge.
-
-### Round-Robin Assertions
-
-The round-robin assertions verify:
-
-- No grant is issued to a requester that was not requesting.
-- A previous non-zero request results in a non-zero registered grant.
-- Grant changes under sustained `req = 1111` contention.
-- Reset clears the registered grant.
-
-Because the round-robin arbiter has a **registered output**, `$past(req)` is used where necessary to align the assertions with the DUT timing.
-
-### SVA Cover Properties
-
-Cover properties are also included to demonstrate that important scenarios were exercised:
-
-- `req = 1111` held for four consecutive cycles.
-- Transition from an idle request vector to an active request vector.
-
-The SVA layer is passive and therefore does not modify DUT functionality, stimulus, waveforms, or existing functional coverage.
-
 ---
 
 ## Functional Coverage
@@ -322,12 +288,9 @@ This project demonstrates practical knowledge of:
 - Cross coverage
 - SystemVerilog Assertions
 - `$onehot0()` invariant checking
-- Temporal checking using `$past()`
-- SVA cover properties
 - Combinational versus registered DUT timing
 - Fixed-priority arbitration
-- Stateful round-robin arbitration
-- Contention and fairness-oriented verification
+- round-robin arbitration
 - Waveform-based debugging
 
 ---
@@ -353,6 +316,4 @@ The **UVM scoreboards** perform end-to-end functional checking using independent
 
 **Functional coverage** measures whether important request, grant, and round-robin state combinations have been exercised.
 
-**SystemVerilog Assertions** provide an additional layer of cycle-level and temporal checking for arbitration invariants, priority behavior, registered round-robin behavior, and reset handling.
-
-Together, these techniques demonstrate a structured RTL verification methodology applicable to **Digital Verification and Design Verification roles**.
+**SystemVerilog Assertions** provide an additional layer of cycle-level and temporal checking for arbitration invariants.
